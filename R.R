@@ -37,3 +37,35 @@ df <- raw %>%
          year >= 2000, year <= 2022) %>%
   select(all_of(keep_cols))
 cat("After filtering:", nrow(df), "rows,", ncol(df), "columns\n")
+
+# ---- 3. Missing values ----------------------------------------------
+# Count missing values in each column
+na_before <- colSums(is.na(df))
+print(na_before)
+
+# Rule 1: drop rows where the electricity mix is unknown
+# (we can't guess a country's whole electricity mix)
+df <- df %>% filter(!is.na(coal_share_elec), !is.na(per_capita_electricity))
+
+# Rule 2: fill small gaps inside each country with linear
+# interpolation (value between the year before and the year after),
+# then carry the nearest value for gaps at the start/end.
+fill_gaps <- function(x) {
+  if (sum(!is.na(x)) < 2) return(x)
+  approx(seq_along(x), x, xout = seq_along(x), rule = 2)$y
+}
+num_fill <- c("population", "gdp", "energy_per_capita",
+              "carbon_intensity_elec", "gas_share_elec", "oil_share_elec",
+              "nuclear_share_elec", "hydro_share_elec",
+              "solar_share_elec", "wind_share_elec")
+df <- df %>% arrange(country, year) %>% group_by(country) %>%
+  mutate(across(all_of(num_fill), fill_gaps)) %>% ungroup()
+
+# Rule 3: anything still missing (country has no data at all for that
+# column) -> fill with the median of that year (all countries)
+df <- df %>% group_by(year) %>%
+  mutate(across(all_of(num_fill),
+                ~ ifelse(is.na(.x), median(.x, na.rm = TRUE), .x))) %>%
+  ungroup()
+
+cat("Missing values left:", sum(is.na(df)), "\n")
