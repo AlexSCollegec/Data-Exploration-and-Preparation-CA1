@@ -215,3 +215,53 @@ onehot <- model.matrix(~ main_source - 1, data = df)
 colnames(onehot) <- gsub("main_source", "src_", colnames(onehot))
 df <- cbind(df, onehot)
 print(head(onehot))
+
+# =====================================================================
+# ---- 8. PCA ---------------------------------------------------------
+# =====================================================================
+# Use the numeric features + label code. scale = TRUE so every
+# feature has mean 0 and sd 1 (otherwise big numbers dominate).
+pca_vars <- c(num_vars, "energy_level_code")
+pca <- prcomp(df[pca_vars], center = TRUE, scale. = TRUE)
+print(summary(pca))
+
+var_exp <- pca$sdev^2 / sum(pca$sdev^2)
+cum_exp <- cumsum(var_exp)
+n_keep  <- which(cum_exp >= 0.80)[1]          # PCs needed for 80%
+cat("PCs needed for 80% of variance:", n_keep, "of", length(pca_vars), "\n")
+
+# Scree plot
+scree <- data.frame(PC = seq_along(var_exp), var = var_exp, cum = cum_exp)
+p6 <- ggplot(scree, aes(PC, var)) + geom_col(fill = "#023047") +
+  geom_line(aes(y = cum), colour = "orange", linewidth = 1) +
+  geom_point(aes(y = cum), colour = "orange") +
+  geom_hline(yintercept = .8, linetype = "dashed") +
+  scale_x_continuous(breaks = scree$PC) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Scree plot: variance explained by each PC",
+       y = "Variance explained", x = "Principal component")
+ggsave("plots/08_scree.png", p6, width = 8, height = 4.5, dpi = 150)
+
+# Loadings - which features build PC1, PC2, PC3
+load <- as.data.frame(pca$rotation[, 1:3])
+print(round(load, 2))
+
+# Biplot-style chart: rows (coloured by main source) + feature arrows
+scores <- as.data.frame(pca$x[, 1:2]); scores$main_source <- df$main_source
+arrows <- load[, 1:2] * 6
+arrows$var <- gsub("_share_elec|log_|_elec", "", rownames(arrows))  # short names
+p7 <- ggplot(scores, aes(PC1, PC2)) +
+  geom_point(aes(colour = main_source), alpha = .25, size = 1) +
+  geom_segment(data = arrows, aes(0, 0, xend = PC1, yend = PC2),
+               arrow = arrow(length = unit(.2, "cm"))) +
+  geom_label(data = arrows, aes(PC1 * 1.15, PC2 * 1.15, label = var),
+             size = 3, alpha = .8) +
+  labs(title = "PCA biplot (PC1 vs PC2)",
+       x = sprintf("PC1 (%.0f%%)", var_exp[1] * 100),
+       y = sprintf("PC2 (%.0f%%)", var_exp[2] * 100), colour = "Main source")
+ggsave("plots/09_pca_biplot.png", p7, width = 9, height = 6.5, dpi = 150)
+
+# Reduced dataset: keep only the first n_keep PCs
+reduced <- cbind(df[, c("country", "year")], pca$x[, 1:n_keep])
+write.csv(reduced, "energy_pca_reduced.csv", row.names = FALSE)
+cat("Reduced data:", nrow(reduced), "rows,", ncol(reduced) - 2, "PCs\n")
