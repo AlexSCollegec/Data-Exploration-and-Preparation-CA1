@@ -69,3 +69,17 @@ df <- df %>% group_by(year) %>%
   ungroup()
 
 cat("Missing values left:", sum(is.na(df)), "\n")
+
+# ---- 4. New features ------------------------------------------------
+df <- df %>% mutate(
+  gdp_per_capita       = gdp / population,
+  renewable_share_elec = solar_share_elec + wind_share_elec,  # new renewables
+  fossil_share_elec    = coal_share_elec + gas_share_elec + oil_share_elec,
+  decade               = paste0(floor(year / 10) * 10, "s")
+)
+
+# Main electricity source = the source with the biggest share
+src_cols <- c("coal_share_elec", "gas_share_elec", "oil_share_elec",
+              "nuclear_share_elec", "hydro_share_elec", "renewable_share_elec")
+src_names <- c("Coal", "Gas", "Oil", "Nuclear", "Hydro", "Wind+Solar")
+df$main_source <- src_names[max.col(as.matrix(df[src_cols]), ties.method = "first")]
