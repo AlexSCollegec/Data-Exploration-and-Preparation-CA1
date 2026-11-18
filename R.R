@@ -14,3 +14,7 @@ library(corrplot)  # correlation chart
 
 dir.create("plots", showWarnings = FALSE)   # folder for saved charts
 set.seed(123)                                # same results every run
+
+# ---- 1. Load the raw data -------------------------------------------
+raw <- read.csv("owid-energy-data.csv", stringsAsFactors = FALSE)
+cat("Raw data:", nrow(raw), "rows,", ncol(raw), "columns\n")
