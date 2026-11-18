@@ -197,3 +197,21 @@ png("plots/07_correlation.png", 1100, 1000, res = 140)
 corrplot(cor(df[num_vars]), method = "color", type = "upper",
          addCoef.col = "black", number.cex = .6, tl.col = "black", tl.cex = .75)
 dev.off()
+
+# =====================================================================
+# ---- 7. Encoding ----------------------------------------------------
+# =====================================================================
+# (a) Label encoding: "energy_level" has a natural order
+#     Low < Medium < High  ->  1, 2, 3
+df$energy_level <- cut(df$energy_per_capita,
+                       breaks = quantile(df$energy_per_capita, c(0, 1/3, 2/3, 1)),
+                       labels = c("Low", "Medium", "High"), include.lowest = TRUE)
+df$energy_level_code <- as.integer(df$energy_level)
+print(head(df[, c("country", "year", "energy_level", "energy_level_code")]))
+
+# (b) One-hot encoding: "main_source" has NO order, so each source
+#     gets its own 0/1 column
+onehot <- model.matrix(~ main_source - 1, data = df)
+colnames(onehot) <- gsub("main_source", "src_", colnames(onehot))
+df <- cbind(df, onehot)
+print(head(onehot))
